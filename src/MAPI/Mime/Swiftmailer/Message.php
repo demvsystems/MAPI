@@ -24,7 +24,7 @@ class Message extends BaseMessage implements MimeConvertible
         return new self($message->obj, $message->parent);
     }
 
-    public function toMime()
+    public function toMime($charset = null)
     {
         DependencySet::register();
 
@@ -169,7 +169,7 @@ class Message extends BaseMessage implements MimeConvertible
                 $this->conversionExceptionsList[] = $e;
             }
 
-            $part = new \Swift_MimePart($html, 'text/html', null);
+            $part = new \Swift_MimePart($html, 'text/html', $charset);
             $part->setEncoder($message->getEncoder());
 
 
