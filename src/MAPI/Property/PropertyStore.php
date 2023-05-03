@@ -9,15 +9,15 @@ use Hfig\MAPI\OLE\Guid\OleGuid;
 use Hfig\MAPI\OLE\Time\OleTime;
 
 
-class PropertyStore 
+class PropertyStore
 {
     const SUBSTG_RX     = '/^__substg1\.0_([0-9A-F]{4})([0-9A-F]{4})(?:-([0-9A-F]{8}))?$/';
     const PROPERTIES_RX = '/^__properties_version1\.0$/';
     const NAMEID_RX     = '/^__nameid_version1\.0$/';
-    
+
     const VALID_RX      = [
-        self::SUBSTG_RX, 
-        self::PROPERTIES_RX, 
+        self::SUBSTG_RX,
+        self::PROPERTIES_RX,
         self::NAMEID_RX
     ];
 
@@ -57,7 +57,7 @@ class PropertyStore
         }
 
 
-        
+
         foreach ($obj->getChildren() as $child) {
             if ($child->isFile()) {
                 if (preg_match(self::PROPERTIES_RX, $child->getName())) {
@@ -80,8 +80,8 @@ class PropertyStore
         // $remaining = clone $obj->getChildren()
 
         $knownPpsAlias = [
-            'guids' => '__substg1.0_00020102', 
-            'props' => '__substg1.0_00030102', 
+            'guids' => '__substg1.0_00020102',
+            'props' => '__substg1.0_00030102',
             'names' => '__substg1.0_00040102'];
 
         $knownPpsObj = array_combine(
@@ -95,13 +95,13 @@ class PropertyStore
                 $knownPpsObj[$alias] = $child;
             }
         }
-       
+
 
         //# parse guids
         //# this is the guids for named properities (other than builtin ones)
         //# i think PS_PUBLIC_STRINGS, and PS_MAPI are builtin.
         //# Scan using an ascii pattern - it's binary data we're looking
-        //# at, so we don't want to look for unicode characters        
+        //# at, so we don't want to look for unicode characters
         $guids  = [PropertySetConstants::PS_PUBLIC_STRINGS()];
         $rawGuid = str_split($knownPpsObj['guids']->getData(), 16);
         foreach ($rawGuid as $guid) {
@@ -125,7 +125,9 @@ class PropertyStore
         $propsData = $knownPpsObj['props']->getData();
         $properties = [];
         foreach (str_split($propsData, 8) as $idx => $rawProp) {
-            if (strlen($rawProp) < 8) break;
+            if (strlen($rawProp) < 8) {
+                break;
+            }
 
             $d      = unpack('vflags/voffset', substr($rawProp, 4));
             $flags  = $d['flags'];
@@ -152,6 +154,13 @@ class PropertyStore
 
             //# a bit sus
             $guid_off = $flags >> 1;
+            // I have no idea what I'm doing
+            // but this break prevents things from exploding
+            // so that's a win I guess, right?
+            if ($guid_off < 2) {
+                break;
+            }
+
             $guid = $guids[$guid_off - 2];
 
             /*$properties[] = [
@@ -159,9 +168,9 @@ class PropertyStore
                 'prop' => $pseudo_prop,
             ];*/
             $properties[$pseudo_prop] = new PropertyKey($prop, $guid);
-					
+
         }
-        
+
 
         //# this leaves a bunch of other unknown chunks of data with completely unknown meaning.
 		//#	pp [:unknown, child.name, child.data.unpack('H*')[0].scan(/.{16}/m)]
@@ -173,7 +182,7 @@ class PropertyStore
     protected function parseSubstg($key, $encoding, $offset, $obj)
     {
         $MULTIVAL = 0x1000;
-        
+
         if (($encoding & $MULTIVAL) != 0) {
             if (!$offset) {
                 //# there is typically one with no offset first, whose data is a series of numbers
@@ -223,7 +232,7 @@ class PropertyStore
         //# Scan using an ascii pattern - it's binary data we're looking
         //# at, so we don't want to look for unicode characters
         foreach (str_split(substr($data, $pad), 16) as $idx => $rawProp) {
-            
+
             // copying ruby implementation's oddness to avoid any endianess issues
             $rawData = unpack('V', $rawProp)[1];
             list($property, $encoding) = str_split(sprintf('%08x', $rawData), 4);
@@ -238,11 +247,11 @@ class PropertyStore
             // improved from ruby-msg - handle more types
             // https://docs.microsoft.com/en-us/office/client-developer/outlook/mapi/property-types
             switch ($encoding) {
-                
+
                 case '0001':    // PT_NULL
                     break;
 
-                
+
                 case '0002':    // PT_I2
                 case '1002':    // PT_MV_I2
                     $value = unpack('v', substr($rawProp, 8, 2))[1];
@@ -265,39 +274,39 @@ class PropertyStore
                 case '1005':    // PT_MV_DOUBLE
                     $value = unpack('e', substr($rawProp, 8, 8))[1];
                     $this->addProperty($key, $value);
-                    break;                
+                    break;
 
                 case '0006':    // PT_CURRENCY
                 case '1006':    // PT_MV_CURRENCY
                     // TODO work out how to interpret PT_CURRENCY (same as VB currency type, apparently)
                     $value = unpack('a8', substr($rawProp, 8, 8))[1];
                     $this->addProperty($key, $value);
-                    break;      
+                    break;
 
-                case '0007':    // PT_APPTIME 
+                case '0007':    // PT_APPTIME
                 case '1007':    // PT_MV_APPTIME
                     // TODO work out how to interpret PT_APPTIME (same as VB time type, apparently)
                     $value = unpack('a8', substr($rawProp, 8, 8))[1];
                     $this->addProperty($key, $value);
-                    break;      
+                    break;
 
-                case '000a':    // PT_ERROR  
+                case '000a':    // PT_ERROR
                     $value = unpack('V', substr($rawProp, 8, 4))[1];
                     $this->addProperty($key, $value);
-                    break;  
+                    break;
 
-                case '000b':    // PT_BOOLEAN 
+                case '000b':    // PT_BOOLEAN
                 case '100b':    // PT_MV_12
                     // Windows 2-byte BOOL
                     $value = unpack('v', substr($rawProp, 8, 2))[1];
                     $this->addProperty($key, $value != 0);
                     break;
 
-                case '000d':    // PT_OBJECT  
+                case '000d':    // PT_OBJECT
                     // pointer to IUnknown - cannot exist in an Outlook property hopefully!!
                     break;
 
-                case '0014':    // PT_I8   
+                case '0014':    // PT_I8
                 case '1014':    // PT_MV_I8
                     //$value = unpack('P', substr($rawProp, 8, 8))[1];
                     // raw data, change endianess
@@ -311,27 +320,27 @@ class PropertyStore
                     $this->addProperty($key, $value);
                     break;
 
-                case '001e':    // PT_STRING8  
+                case '001e':    // PT_STRING8
                 case '101e':    // PT_MV_STRING8
                     // LPSTR - stored in a stream
                     //$value = substr($rawProp, 8);
                     //$this->addProperty($key, $value);
                     break;
 
-                case '001f':    // PT_TSTRING   
+                case '001f':    // PT_TSTRING
                 case '101f':    // PT_MV_TSTRING
-                    //  LPWSTR - stored in a stream  
+                    //  LPWSTR - stored in a stream
                     //$value = substr($rawProp, 8);
                     //$this->addProperty($key, $value);
                     break;
 
-                case '0040':    // PT_SYSTIME 
+                case '0040':    // PT_SYSTIME
                 case '1040':    // PT_MV_SYSTIME
                     $value = OleTime::getTimeFromOleTime(substr($rawProp, 8));
                     $this->addProperty($key, $value);
                     break;
 
-                case '0048':    // PT_CLSID 
+                case '0048':    // PT_CLSID
                     $value = (string)OleGuid::fromBytes($rawProp);
                     $this->addProperty($key, $value);
                     break;
@@ -341,16 +350,16 @@ class PropertyStore
                     $this->addProperty($key, $value);
                     break;
 
-                case '00fb':    // PT_SVREID 
-                    // Variable size, a 16-bit (2-byte) COUNT followed by a structure. 
+                case '00fb':    // PT_SVREID
+                    // Variable size, a 16-bit (2-byte) COUNT followed by a structure.
                     break;
 
-                case '00fd':    // PT_SRESTRICT 
-                    // Variable size, a byte array representing one or more Restriction structures. 
+                case '00fd':    // PT_SRESTRICT
+                    // Variable size, a byte array representing one or more Restriction structures.
                     break;
 
-                case '00fe':    // PT_ACTIONS 
-                    // Variable size, a 16-bit (2-byte) COUNT of actions (not bytes) followed by that many Rule Action structures. 
+                case '00fe':    // PT_ACTIONS
+                    // Variable size, a 16-bit (2-byte) COUNT of actions (not bytes) followed by that many Rule Action structures.
                     break;
 
                 case '0102':    // PT_BINARY
@@ -367,20 +376,20 @@ class PropertyStore
             }
         }
 
-        
+
     }
 
     protected function addProperty($key, $value, $pos = null)
     {
-        
-        
+
+
         //# map keys in the named property range through nameid
         if (is_int($key) && $key >= 0x8000) {
             if (!$this->nameId) {
                 $this->logger->warning('No nameid section yet named properties used');
                 $key = new PropertyKey($key);
             }
-            elseif (isset($this->nameId[$key])) {                
+            elseif (isset($this->nameId[$key])) {
                 $key = $this->nameId[$key];
             }
             else {
@@ -394,7 +403,7 @@ class PropertyStore
             $key = new PropertyKey($key);
         }
 
-        
+
         //$this->logger->debug(sprintf('Writing property %s', print_r($key, true)));
         //$hash = $key->getHash();
         if (!is_null($pos)) {
@@ -412,7 +421,7 @@ class PropertyStore
         else {
             $this->cache->set($key, $value);
         }
-        
+
     }
 
 
