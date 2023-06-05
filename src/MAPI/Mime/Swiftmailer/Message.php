@@ -180,10 +180,18 @@ class Message extends BaseMessage implements MimeConvertible
 
         // attachments
         foreach ($this->getAttachments() as $a) {
-            $wa = Attachment::wrap($a);
-            $attachment = $wa->toMime();
+            try {
+                $wa = Attachment::wrap($a);
+                $attachment = $wa->toMime();
 
-            $message->attach($attachment);
+                $message->attach($attachment);
+            }
+            catch (\Exception $e) { // getBody() can throw \Exception
+                if (!$this->muteConversionExceptions) {
+                    throw $e;
+                }
+                $this->conversionExceptionsList[] = $e;
+            }
         }
 
         return $message;
