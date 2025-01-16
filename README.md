@@ -1,7 +1,7 @@
 # Hfig/MAPI
 
 ## Introduction
-``Hfig/MAPI`` is a PHP 7 library for reading and working with Microsoft Outlook/Exchange format email messages (``.msg`` files, aka MAPI documents).
+``Hfig/MAPI`` is a PHP library for reading and working with Microsoft Outlook/Exchange format email messages (``.msg`` files, aka MAPI documents).
 
 The library can parse MAPI documents, and programatically extract the properties and streams of the document.
 
@@ -23,6 +23,12 @@ Install using composer
 
 ```sh
 composer require hfig/mapi
+
+# our dependency pear/ole has an unresolved dependency currently
+# therefore you need to install one of these explicitly:
+composer require pear/pear-core-minimal
+# or
+composer require pear/pear-core
 
 # needed if you want to convert to MIME format
 composer require swiftmailer/swiftmailer

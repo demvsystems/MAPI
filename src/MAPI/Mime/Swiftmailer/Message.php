@@ -24,7 +24,7 @@ class Message extends BaseMessage implements MimeConvertible
         return new self($message->obj, $message->parent);
     }
 
-    public function toMime($charset = null)
+    public function toMime(): \Swift_Message
     {
         DependencySet::register();
 
@@ -169,7 +169,7 @@ class Message extends BaseMessage implements MimeConvertible
                 $this->conversionExceptionsList[] = $e;
             }
 
-            $part = new \Swift_MimePart($html, 'text/html', $charset);
+            $part = new \Swift_MimePart($html, 'text/html', null);
             $part->setEncoder($message->getEncoder());
 
 
@@ -180,18 +180,10 @@ class Message extends BaseMessage implements MimeConvertible
 
         // attachments
         foreach ($this->getAttachments() as $a) {
-            try {
-                $wa = Attachment::wrap($a);
-                $attachment = $wa->toMime();
+            $wa = Attachment::wrap($a);
+            $attachment = $wa->toMime();
 
-                $message->attach($attachment);
-            }
-            catch (\Exception $e) { // getBody() can throw \Exception
-                if (!$this->muteConversionExceptions) {
-                    throw $e;
-                }
-                $this->conversionExceptionsList[] = $e;
-            }
+            $message->attach($attachment);
         }
 
         return $message;
